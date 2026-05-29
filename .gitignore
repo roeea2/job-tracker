@@ -1,0 +1,13 @@
+# Environment — never commit your API key
+.env
+
+# Runtime data — all generated locally
+data/
+cvs/
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# macOS
+.DS_Store

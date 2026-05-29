@@ -1,0 +1,51 @@
+{
+  "profile": {
+    "name":     "Your Full Name",
+    "email":    "you@example.com",
+    "phone":    "+1-555-0100",
+    "location": "Your City, Country",
+    "linkedin": "linkedin.com/in/yourhandle"
+  },
+
+  "search": {
+    "location":  "Israel",
+    "minScore":  50,
+    "searches": [
+      { "keywords": "head of customer success",         "role_type": "customer_success" },
+      { "keywords": "director customer success",         "role_type": "customer_success" },
+      { "keywords": "VP customer success",               "role_type": "customer_success" },
+      { "keywords": "chief customer officer",            "role_type": "customer_success" },
+      { "keywords": "head of customer experience",       "role_type": "customer_success" },
+      { "keywords": "director support operations",       "role_type": "support"          },
+      { "keywords": "head of technical support",         "role_type": "support"          },
+      { "keywords": "VP support",                        "role_type": "support"          },
+      { "keywords": "director AI engineering",           "role_type": "ai_engineering"   },
+      { "keywords": "head of AI",                        "role_type": "ai_engineering"   },
+      { "keywords": "VP product AI",                     "role_type": "product"          },
+      { "keywords": "director product management",       "role_type": "product"          },
+      { "keywords": "head of product",                   "role_type": "product"          },
+      { "keywords": "chief product officer",             "role_type": "product"          }
+    ],
+    "seniorSignals": [
+      "head of", "director", "vp", "vice president", "chief",
+      "cco", "cpo", "cto", "svp", "evp"
+    ],
+    "roleSignals": {
+      "customer_success": ["customer success", "customer experience"],
+      "ai_engineering":   ["ai", "artificial intelligence", "machine learning"],
+      "product":          ["product manager", "product management"],
+      "support":          ["support", "technical support"]
+    },
+    "domainSignals": ["saas", "b2b", "cybersecurity", "security", "startup", "scale-up"]
+  },
+
+  "cv": {
+    "baseHtmlPath":      "./my-resume.html",
+    "model":             "claude-opus-4-7",
+    "pdfFilenamePrefix": "Your_Name_CV"
+  },
+
+  "server": {
+    "port": 3737
+  }
+}

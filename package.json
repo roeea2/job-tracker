@@ -1,0 +1,17 @@
+{
+  "name": "roee-job-tracker",
+  "version": "1.0.0",
+  "description": "LinkedIn job scraper + CV customizer + dashboard for Roee Aizman",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env --experimental-sqlite src/server.js",
+    "scrape": "node --env-file=.env --experimental-sqlite src/scraper.js",
+    "enrich": "node --env-file=.env --experimental-sqlite src/enrich.js",
+    "dev": "node --env-file=.env --experimental-sqlite --watch src/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "express": "^4.19.2",
+    "playwright": "^1.44.1"
+  }
+}
