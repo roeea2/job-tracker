@@ -6,46 +6,117 @@ import { baseHtmlPath, cvConfig, profile } from './config.js';
 
 const client = new Anthropic();
 
-export async function customizeCV(jobId) {
+// ── Step 1: Analyze job + gap-check current CV ────────────────────────────────
+
+export async function analyzeJob(jobId) {
   const job = getJobById(jobId);
   if (!job) throw new Error(`Job ${jobId} not found`);
 
   const baseHtml = readFileSync(baseHtmlPath, 'utf-8');
-  const candidateName = profile.name;
+
+  console.log(`\nAnalyzing: ${job.title} @ ${job.company}`);
+
+  const message = await client.messages.create({
+    model: cvConfig.model || 'claude-opus-4-7',
+    max_tokens: 2048,
+    system: `You are a senior talent acquisition expert and resume coach.
+Return ONLY valid JSON — no markdown fences, no extra text.`,
+    messages: [{
+      role: 'user',
+      content: `Analyze this job posting against the candidate's current resume.
+
+JOB:
+Title: ${job.title}
+Company: ${job.company}
+Description:
+${job.description || '(No description available — analyze from title only)'}
+
+CANDIDATE RESUME (HTML — read the text content):
+${baseHtml}
+
+Return this exact JSON structure:
+{
+  "signals": [
+    "string — top 6 skills/keywords/success signals the hiring manager is looking for"
+  ],
+  "gaps": [
+    {
+      "signal": "the signal from above",
+      "issue": "specific weakness or missing proof in the current resume",
+      "severity": "high | medium | low"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "question": "A targeted question to get real information that fills a gap — ask for specific numbers, outcomes, team sizes, technologies, or achievements the resume doesn't currently prove",
+      "context": "Why this matters for THIS specific job"
+    }
+  ]
+}
+
+Rules:
+- signals: exactly 6, ordered by importance to this specific job
+- gaps: only real gaps — if something is already well-proved, skip it
+- questions: 2-4 questions maximum, one at a time flow — start with the highest-impact gap
+- questions must be answerable with real facts (no "did you ever use X" — ask "what specific outcome did X produce")
+- severity high = likely dealbreaker if missing, medium = weakens application, low = nice to have`
+    }]
+  });
+
+  try {
+    return JSON.parse(message.content[0].text);
+  } catch {
+    throw new Error('Failed to parse analysis response: ' + message.content[0].text.slice(0, 200));
+  }
+}
+
+// ── Step 2: Generate customized CV using analysis + user answers ──────────────
+
+export async function customizeCV(jobId, answers = []) {
+  const job = getJobById(jobId);
+  if (!job) throw new Error(`Job ${jobId} not found`);
+
+  const baseHtml = readFileSync(baseHtmlPath, 'utf-8');
 
   console.log(`\nCustomizing CV for: ${job.title} @ ${job.company}`);
 
-  const prompt = `You are a senior resume writer. Tailor the HTML resume below for the specific job posting. Do NOT fabricate experience, change dates, change company names, or invent roles.
-
-JOB DETAILS:
-Title: ${job.title}
-Company: ${job.company}
-Seniority: ${job.seniority}
-Role type: ${job.role_type}
-Description:
-${job.description || '(No description available)'}
-
-THE RESUME HTML:
-${baseHtml}
-
-INSTRUCTIONS:
-1. Identify the top 5 keywords and requirements from the job description.
-2. Modify the resume to highlight the most relevant experience for THIS specific job.
-3. You MAY: rewrite or add bullet points to existing jobs, modify the professional summary, adjust the header subtitle, reorder competencies to put the most relevant ones first.
-4. You MUST NOT: change company names, job titles, date ranges, or invent new roles/companies.
-5. Keep modifications natural — not keyword-stuffed.
-6. Keep the exact same HTML structure and CSS classes.
-7. Make the header subtitle perfectly match this role type.
-
-Provide a short analysis (3-5 bullets) of what you changed and why, as an HTML comment at the very top: <!-- CV_NOTES: ... -->
-
-Return ONLY the complete modified HTML document, starting with <!-- CV_NOTES and ending with </html>.`;
+  const answersBlock = answers.length
+    ? `\nCANDIDATE PROVIDED ADDITIONAL CONTEXT (real facts — use these to strengthen the resume):\n${answers.map((a, i) => `Q${i + 1}: ${a.question}\nA: ${a.answer}`).join('\n\n')}`
+    : '';
 
   const message = await client.messages.create({
     model: cvConfig.model || 'claude-opus-4-7',
     max_tokens: 8192,
     system: 'You are a professional resume writer. Return only valid HTML — no markdown fences, no extra text outside the HTML document.',
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{
+      role: 'user',
+      content: `Tailor this HTML resume for the specific job below.
+
+JOB:
+Title: ${job.title}
+Company: ${job.company}
+Seniority: ${job.seniority}
+Description:
+${job.description || '(No description available)'}
+${answersBlock}
+
+THE RESUME HTML:
+${baseHtml}
+
+RULES:
+- You MAY: rewrite or add bullet points, modify the summary, adjust the header subtitle, reorder competencies
+- You MUST NOT: change company names, job titles, date ranges, or invent roles
+- If the candidate gave additional context above, weave it naturally into the relevant bullet points as real achievements
+- Mirror the job description language naturally — not keyword-stuffed
+- Keep the exact same HTML structure and CSS classes
+- Make the header subtitle match this role type precisely
+
+Put a short analysis (3-5 bullets on what changed and why) ONLY in an HTML comment at the very top:
+<!-- CV_NOTES: ... -->
+
+Return ONLY the complete modified HTML, starting with <!-- CV_NOTES and ending with </html>.`
+    }]
   });
 
   const cv_html = message.content[0].text;
@@ -56,8 +127,9 @@ Return ONLY the complete modified HTML document, starting with <!-- CV_NOTES and
   saveCustomizedCv(jobId, cv_html, cv_notes);
   console.log(`  CV saved. Generating PDF...`);
 
-  await generatePdf(jobId, cv_html, cvConfig.pdfFilenamePrefix || candidateName.replace(/\s+/g, '_'));
-  console.log(`  PDF ready. Notes: ${cv_notes.slice(0, 120)}...`);
+  const prefix = cvConfig.pdfFilenamePrefix || profile.name.replace(/\s+/g, '_');
+  await generatePdf(jobId, cv_html, prefix);
+  console.log(`  PDF ready.`);
 
   return { cv_html, cv_notes };
 }

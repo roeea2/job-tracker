@@ -312,6 +312,44 @@
     }
     .cv-placeholder svg { opacity: 0.3; }
 
+    /* ── ANALYSIS FLOW ── */
+    .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
+
+    .analysis-section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+    .analysis-section h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+
+    .signals-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .signal-chip { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 500; }
+
+    .gap-list { display: flex; flex-direction: column; gap: 8px; }
+    .gap-item { display: flex; gap: 10px; align-items: flex-start; }
+    .gap-sev { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; white-space: nowrap; margin-top: 1px; }
+    .gap-sev.high   { background: #fee2e2; color: #b91c1c; }
+    .gap-sev.medium { background: #fef3c7; color: #92400e; }
+    .gap-sev.low    { background: #f0fdf4; color: #166534; }
+    .gap-text { font-size: 12.5px; line-height: 1.55; color: #374151; }
+    .gap-signal { font-weight: 600; color: var(--navy); }
+
+    /* Q&A */
+    .qa-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .qa-progress { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .qa-question-box { background: var(--navy); color: #fff; border-radius: 8px; padding: 14px 16px; }
+    .qa-question-text { font-size: 14px; font-weight: 600; line-height: 1.5; margin-bottom: 6px; }
+    .qa-context { font-size: 11.5px; color: #94a3b8; line-height: 1.5; }
+    .qa-answer-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .qa-answer-input {
+      width: 100%; min-height: 80px; border: 1.5px solid var(--border);
+      border-radius: 6px; padding: 10px 12px; font-size: 13px; font-family: inherit;
+      resize: vertical; outline: none; line-height: 1.55;
+    }
+    .qa-answer-input:focus { border-color: var(--gold); }
+    .qa-answered { display: flex; flex-direction: column; gap: 6px; }
+    .qa-answered-item { background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px 12px; }
+    .qa-answered-q { font-size: 11px; font-weight: 600; color: #065f46; margin-bottom: 3px; }
+    .qa-answered-a { font-size: 12.5px; color: #374151; }
+    .qa-skip { font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; align-self: flex-start; }
+    .qa-skip:hover { color: var(--text); }
+
     /* left panel sections */
     .detail-section { margin-bottom: 20px; }
     .detail-section h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
@@ -485,20 +523,75 @@
 
         <div class="tab-content active" id="tab-cv">
           <div class="cv-frame-wrap" id="cvFrameWrap">
+
+            <!-- STATE: no CV yet — start button -->
             <div class="cv-placeholder" id="cvPlaceholder">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              <p>No customized CV yet</p>
-              <button class="btn btn-gold" id="generateCvBtn" onclick="generateCV()">Generate with AI</button>
+              <p style="font-size:14px;font-weight:600;color:var(--navy)">Tailor your CV to this job</p>
+              <p style="font-size:12px;max-width:300px;line-height:1.6">AI will analyze the job, find gaps in your CV, and ask you targeted questions before rewriting.</p>
+              <button class="btn btn-gold" id="startAnalysisBtn" onclick="startAnalysis()">Analyze &amp; Customize</button>
             </div>
-            <div class="cv-frame-actions hidden" id="cvFrameActions">
-              <span class="cv-notes-box" id="cvNotesBox"></span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-                <button class="btn btn-outline btn-sm" onclick="generateCV()">Regenerate CV</button>
+
+            <!-- STATE: analyzing -->
+            <div class="cv-placeholder hidden" id="cvAnalyzing">
+              <div class="spinner" style="width:32px;height:32px;border-width:3px;border-color:rgba(196,149,42,0.2);border-top-color:var(--gold)"></div>
+              <p style="font-size:13px;color:var(--muted)" id="analyzingMsg">Analyzing job description…</p>
+            </div>
+
+            <!-- STATE: analysis results + Q&A -->
+            <div class="hidden" id="cvAnalysisFlow" style="overflow-y:auto;padding:4px 2px;flex:1">
+              <div class="analysis-wrap">
+
+                <div class="analysis-section">
+                  <h4>What this job is really looking for</h4>
+                  <div class="signals-list" id="signalsList"></div>
+                </div>
+
+                <div class="analysis-section" id="gapsSection">
+                  <h4>Gaps in your current CV</h4>
+                  <div class="gap-list" id="gapsList"></div>
+                </div>
+
+                <!-- Q&A one at a time -->
+                <div class="analysis-section" id="qaSection" style="display:none">
+                  <h4>Help me improve your CV <span class="qa-progress" id="qaProgress"></span></h4>
+                  <div class="qa-wrap">
+                    <div id="qaAnswered" class="qa-answered"></div>
+                    <div id="qaCurrentQuestion" class="qa-question-box">
+                      <div class="qa-question-text" id="qaQuestionText"></div>
+                      <div class="qa-context" id="qaQuestionContext"></div>
+                    </div>
+                    <div class="qa-answer-wrap">
+                      <textarea class="qa-answer-input" id="qaAnswerInput" placeholder="Answer honestly — these facts will be woven into your CV…" rows="3"></textarea>
+                      <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn btn-gold btn-sm" onclick="submitAnswer()">Next →</button>
+                        <button class="qa-skip" onclick="skipQuestion()">Skip this question</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Generate button after Q&A -->
+                <div id="generateSection" style="display:none">
+                  <button class="btn btn-gold" style="width:100%;padding:12px" onclick="generateCV()">
+                    Generate Tailored CV
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- STATE: CV ready -->
+            <div class="hidden" id="cvReady" style="display:flex;flex-direction:column;gap:10px;flex:1">
+              <div class="cv-notes-box" id="cvNotesBox"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-outline btn-sm" onclick="startAnalysis()">Re-analyze &amp; Redo</button>
                 <a class="btn btn-outline btn-sm" id="cvHtmlLink" href="#" target="_blank">View HTML</a>
                 <a class="btn btn-gold btn-sm" id="cvPdfLink" href="#" download>Download PDF</a>
               </div>
+              <iframe class="cv-iframe" id="cvFrame" src="" style="flex:1;min-height:480px"></iframe>
             </div>
-            <iframe class="cv-iframe hidden" id="cvFrame" src=""></iframe>
+
           </div>
         </div>
 
@@ -645,59 +738,154 @@ async function openDetail(id) {
 }
 
 function showCvFrame(id, notes, pdfReady) {
-  document.getElementById('cvPlaceholder').classList.add('hidden');
-  document.getElementById('cvFrame').classList.remove('hidden');
-  document.getElementById('cvFrameActions').classList.remove('hidden');
+  setCvState('ready');
   document.getElementById('cvFrame').src = `/api/jobs/${id}/cv?t=${Date.now()}`;
   document.getElementById('cvHtmlLink').href = `/api/jobs/${id}/cv`;
   document.getElementById('cvNotesBox').textContent = notes || '';
 
-  // PDF download
   const pdfLink = document.getElementById('cvPdfLink');
-  if (pdfReady) {
-    pdfLink.href = `/api/jobs/${id}/cv.pdf`;
-    pdfLink.style.display = '';
-  } else {
-    pdfLink.style.display = 'none';
-  }
+  pdfLink.href = pdfReady ? `/api/jobs/${id}/cv.pdf` : '#';
+  pdfLink.style.display = pdfReady ? '' : 'none';
 
-  // Apply section
   const applySection = document.getElementById('applySection');
   applySection.style.display = pdfReady ? '' : 'none';
   if (pdfReady) {
     document.getElementById('applyBtn').href = document.getElementById('detailLink').href;
     document.getElementById('pdfDownloadBtn').href = `/api/jobs/${id}/cv.pdf`;
-    document.getElementById('pdfDownloadBtn').download = `Roee_Aizman_CV_${id}.pdf`;
+    document.getElementById('pdfDownloadBtn').download = `CV_${id}.pdf`;
   }
 }
 
+function setCvState(state) {
+  const states = ['cvPlaceholder', 'cvAnalyzing', 'cvAnalysisFlow', 'cvReady'];
+  states.forEach(s => document.getElementById(s).classList.add('hidden'));
+  if (state === 'placeholder')    document.getElementById('cvPlaceholder').classList.remove('hidden');
+  if (state === 'analyzing')      document.getElementById('cvAnalyzing').classList.remove('hidden');
+  if (state === 'analysis')       document.getElementById('cvAnalysisFlow').classList.remove('hidden');
+  if (state === 'ready')          document.getElementById('cvReady').classList.remove('hidden');
+}
+
 function showCvPlaceholder() {
-  document.getElementById('cvPlaceholder').classList.remove('hidden');
-  document.getElementById('cvFrame').classList.add('hidden');
-  document.getElementById('cvFrameActions').classList.add('hidden');
+  setCvState('placeholder');
+}
+
+// ── Analysis + Q&A state ──────────────────────────────────────────────────────
+let analysisData = null;   // { signals, gaps, questions }
+let qaAnswers    = [];     // [{ question, answer }]
+let qaIndex      = 0;
+
+async function startAnalysis() {
+  analysisData = null; qaAnswers = []; qaIndex = 0;
+  setCvState('analyzing');
+  document.getElementById('analyzingMsg').textContent = 'Analyzing job description…';
+
+  try {
+    const res = await fetch(`/api/jobs/${currentJobId}/analyze`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    analysisData = data;
+    renderAnalysis(data);
+    setCvState('analysis');
+  } catch (err) {
+    setCvState('placeholder');
+    toast('Analysis error: ' + err.message, 'error');
+  }
+}
+
+function renderAnalysis(data) {
+  // Signals
+  document.getElementById('signalsList').innerHTML =
+    (data.signals || []).map(s => `<span class="signal-chip">${esc(s)}</span>`).join('');
+
+  // Gaps
+  const gapsEl = document.getElementById('gapsList');
+  if (!data.gaps?.length) {
+    document.getElementById('gapsSection').style.display = 'none';
+  } else {
+    document.getElementById('gapsSection').style.display = '';
+    gapsEl.innerHTML = data.gaps.map(g => `
+      <div class="gap-item">
+        <span class="gap-sev ${g.severity}">${g.severity}</span>
+        <div class="gap-text"><span class="gap-signal">${esc(g.signal)}:</span> ${esc(g.issue)}</div>
+      </div>`).join('');
+  }
+
+  // Start Q&A if questions exist
+  if (data.questions?.length) {
+    document.getElementById('qaSection').style.display = '';
+    document.getElementById('generateSection').style.display = 'none';
+    renderQuestion(0);
+  } else {
+    document.getElementById('qaSection').style.display = 'none';
+    document.getElementById('generateSection').style.display = '';
+  }
+
+  document.getElementById('qaAnswered').innerHTML = '';
+}
+
+function renderQuestion(idx) {
+  const questions = analysisData.questions || [];
+  if (idx >= questions.length) {
+    // All questions answered — show generate button
+    document.getElementById('qaSection').style.display = 'none';
+    document.getElementById('generateSection').style.display = '';
+    return;
+  }
+
+  const q = questions[idx];
+  document.getElementById('qaProgress').textContent = `Question ${idx + 1} of ${questions.length}`;
+  document.getElementById('qaQuestionText').textContent = q.question;
+  document.getElementById('qaQuestionContext').textContent = q.context || '';
+  document.getElementById('qaAnswerInput').value = '';
+  document.getElementById('qaAnswerInput').focus();
+  qaIndex = idx;
+}
+
+function submitAnswer() {
+  const answer = document.getElementById('qaAnswerInput').value.trim();
+  if (!answer) { toast('Please type an answer, or skip the question.', 'error'); return; }
+
+  const q = analysisData.questions[qaIndex];
+  qaAnswers.push({ question: q.question, answer });
+
+  // Show answered question
+  const answeredEl = document.getElementById('qaAnswered');
+  answeredEl.innerHTML += `
+    <div class="qa-answered-item">
+      <div class="qa-answered-q">${esc(q.question)}</div>
+      <div class="qa-answered-a">${esc(answer)}</div>
+    </div>`;
+
+  renderQuestion(qaIndex + 1);
+}
+
+function skipQuestion() {
+  renderQuestion(qaIndex + 1);
 }
 
 async function generateCV() {
-  const btn = document.getElementById('generateCvBtn') || document.querySelector('[onclick="generateCV()"]');
-  const originalText = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating…'; }
-  toast('Customizing CV with AI... this takes ~30 seconds', 'success');
+  setCvState('analyzing');
+  document.getElementById('analyzingMsg').textContent = 'Generating your tailored CV… (~30 sec)';
 
   try {
-    const res = await fetch(`/api/jobs/${currentJobId}/customize-cv`, { method: 'POST' });
+    const res = await fetch(`/api/jobs/${currentJobId}/customize-cv`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: qaAnswers }),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
+
     showCvFrame(currentJobId, data.cv_notes, true);
-    // Update in allJobs
     const j = allJobs.find(j => j.id === currentJobId);
     if (j) j.has_cv = 1;
     renderTable();
     loadStats();
-    toast('CV customized successfully!', 'success');
+    toast('CV tailored and PDF ready!', 'success');
   } catch (err) {
+    setCvState('analysis');
     toast('Error: ' + err.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
   }
 }
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { readFileSync, existsSync } from 'fs';
 import { getAllJobs, getJobById, updateJobStatus, updateJobNotes, getStats } from './db.js';
 import { serverPort, baseHtmlPath } from './config.js';
-import { customizeCV } from './cv-customizer.js';
+import { customizeCV, analyzeJob } from './cv-customizer.js';
 import { cvPdfPath } from './pdf-generator.js';
 import { runScraper } from './scraper.js';
 import { enrichJobs } from './enrich.js';
@@ -47,9 +47,21 @@ app.patch('/api/jobs/:id/notes', (req, res) => {
 
 // ── CV ────────────────────────────────────────────────────────────────────────
 
+// Analyze job vs current CV — returns signals, gaps, and questions
+app.post('/api/jobs/:id/analyze', async (req, res) => {
+  try {
+    const analysis = await analyzeJob(Number(req.params.id));
+    res.json(analysis);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate customized CV — optionally accepts answers from the Q&A flow
 app.post('/api/jobs/:id/customize-cv', async (req, res) => {
   try {
-    const result = await customizeCV(Number(req.params.id));
+    const answers = req.body.answers || [];
+    const result = await customizeCV(Number(req.params.id), answers);
     res.json({ ok: true, cv_notes: result.cv_notes });
   } catch (err) {
     res.status(500).json({ error: err.message });
